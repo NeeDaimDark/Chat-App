@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import '../widgets/user_image_picker.dart';
 
 final _firebaseAuth = FirebaseAuth.instance;
 class AuthScreen extends StatefulWidget {
@@ -14,11 +19,21 @@ class _AuthScreenState extends State<AuthScreen> {
   var _isLogin = true;
   var _enteredEmail = '';
   var _enteredPassword = '';
+  File? _selectedImage;
 
   void _submitAuthForm() async {
     final isValid = _formKey.currentState!.validate();
     FocusScope.of(context).unfocus();
-
+    if(!_isLogin && _selectedImage == null){
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please pick an image.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
 
     if(isValid == false){
       return;
@@ -53,9 +68,14 @@ class _AuthScreenState extends State<AuthScreen> {
             .createUserWithEmailAndPassword(
           email: _enteredEmail,
           password: _enteredPassword,
-
         );
-        print(userCredentials);
+        final storageRef = FirebaseStorage.instance.ref()
+            .child('user_images')
+            .child('${userCredentials.user!.uid}.jpg');
+        await storageRef.putFile(_selectedImage!);
+        final imageUrl = await storageRef.getDownloadURL();
+        print(imageUrl);
+
 
       } on FirebaseAuthException catch (e) {
         String message = 'An error occurred, please check your credentials!';
@@ -65,7 +85,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(message ?? 'An error occurred, please check your credentials!'),
+            content: Text(message),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -105,6 +125,15 @@ class _AuthScreenState extends State<AuthScreen> {
                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+
+                                if(!_isLogin)...[
+                                  UserImagePicker(
+                                    onImagePicked: (pickedImage){
+                                      _selectedImage = pickedImage;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 TextFormField(
                                   key: const ValueKey('email'),
                                   keyboardType: TextInputType.emailAddress,
