@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,7 +20,9 @@ class _AuthScreenState extends State<AuthScreen> {
   var _isLogin = true;
   var _enteredEmail = '';
   var _enteredPassword = '';
+  var _enteredUsername = '';
   File? _selectedImage;
+  var _isAuthenticating = false;
 
   void _submitAuthForm() async {
     final isValid = _formKey.currentState!.validate();
@@ -41,6 +44,9 @@ class _AuthScreenState extends State<AuthScreen> {
     _formKey.currentState!.save();
     if (_isLogin){
       try {
+        setState(() {
+          _isAuthenticating = true;
+        });
       final userCredentials =await _firebaseAuth.signInWithEmailAndPassword(
         email: _enteredEmail,
         password: _enteredPassword,
@@ -74,7 +80,14 @@ class _AuthScreenState extends State<AuthScreen> {
             .child('${userCredentials.user!.uid}.jpg');
         await storageRef.putFile(_selectedImage!);
         final imageUrl = await storageRef.getDownloadURL();
-        print(imageUrl);
+        await FirebaseFirestore.instance.collection(
+            'users'
+        ).doc(userCredentials.user!.uid).set({
+          'username':  _enteredUsername,
+          'email': _enteredEmail,
+          'image_url': imageUrl,
+        }
+        );
 
 
       } on FirebaseAuthException catch (e) {
@@ -89,6 +102,9 @@ class _AuthScreenState extends State<AuthScreen> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
+        setState(() {
+          _isAuthenticating = false;
+        });
       } catch (e) {
         print(e);
       }
@@ -155,6 +171,24 @@ class _AuthScreenState extends State<AuthScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 12),
+                                if(!_isLogin)
+                                TextFormField(
+                                  key: const ValueKey('username'),
+                                  enableSuggestions: false,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Username',
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().length < 4) {
+                                      return 'Username must be at least 4 characters long.';
+                                    }
+                                    return null;
+                                  },
+                                  onSaved: (value) {
+                                     _enteredUsername = value!;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
                                 TextFormField(
                                   key: const ValueKey('password'),
                                   obscureText: true,
@@ -172,6 +206,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 12),
+                                if(_isAuthenticating)
+                                  const CircularProgressIndicator(),
+                                if(!_isAuthenticating)
                                 ElevatedButton(
                                   onPressed: _submitAuthForm,
                                   style: ElevatedButton.styleFrom(
@@ -180,6 +217,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                   child:  Text(_isLogin? 'Login':'Sign Up'),
                                 ),
+                                if(!_isAuthenticating)
                                 TextButton(
                                     onPressed: (){
                                       setState(() {
