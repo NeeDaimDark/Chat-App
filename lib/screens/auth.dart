@@ -25,7 +25,28 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     _formKey.currentState!.save();
     if (_isLogin){
-      // Log user in
+      try {
+      final userCredentials =await _firebaseAuth.signInWithEmailAndPassword(
+        email: _enteredEmail,
+        password: _enteredPassword,
+      );
+      print(userCredentials);
+      } on FirebaseAuthException catch (e) {
+        String message = 'An error occurred, please check your credentials!';
+        if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+          message = e.message!;
+        }
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      } catch (e) {
+        print(e);
+      }
+
     } else {
       try {
         final userCredentials = await _firebaseAuth
